@@ -28,3 +28,7 @@
 .model-description {
   font-size: var(--font-size-xs);
 }
+
+.input-error {
+  font-size: var(--font-size-xs);
+}

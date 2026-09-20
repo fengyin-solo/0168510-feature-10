@@ -1,4 +1,5 @@
 import type { AppConfig, ConfigValidation } from '../types';
+import { AVAILABLE_MODELS } from '../types';
 
 /**
  * 验证 API 密钥格式
@@ -90,26 +91,39 @@ export function validateURL(url: string): boolean {
 /**
  * 验证完整配置
  * @param config 应用配置
- * @returns 验证结果
+ * @returns 验证结果（errors 中按字段写明不通过的原因）
  */
 export function validateConfig(config: Partial<AppConfig>): ConfigValidation {
   const errors: ConfigValidation['errors'] = {};
-  
+
   // 验证 API Key
   if (config.apiKey !== undefined && !validateAPIKey(config.apiKey)) {
     errors.apiKey = 'API 密钥格式无效，请检查后重试';
   }
-  
+
+  // 验证模型是否在可用列表中
+  const model = config.model !== undefined
+    ? AVAILABLE_MODELS.find((m) => m.id === config.model)
+    : undefined;
+  if (config.model !== undefined && !model) {
+    errors.model = '所选模型不在可用模型列表中';
+  }
+
   // 验证 temperature
   if (config.temperature !== undefined && !validateTemperature(config.temperature)) {
     errors.temperature = 'Temperature 必须在 0-2 范围内';
   }
-  
+
   // 验证 maxTokens
-  if (config.maxTokens !== undefined && !validateMaxTokens(config.maxTokens)) {
-    errors.maxTokens = 'Max Tokens 必须是正整数';
+  if (config.maxTokens !== undefined) {
+    if (!validateMaxTokens(config.maxTokens)) {
+      errors.maxTokens = 'Max Tokens 必须是正整数';
+    } else if (model?.maxContext !== undefined && config.maxTokens > model.maxContext) {
+      // 组合校验：maxTokens 不能超过所选模型支持的最大上下文
+      errors.maxTokens = `Max Tokens 超过所选模型支持的最大上下文（${model.maxContext.toLocaleString()}），请调低数值或更换模型`;
+    }
   }
-  
+
   return {
     isValid: Object.keys(errors).length === 0,
     errors,

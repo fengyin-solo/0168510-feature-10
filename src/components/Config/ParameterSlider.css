@@ -31,6 +31,10 @@
   font-size: var(--font-size-xs);
 }
 
+.parameter-error {
+  font-size: var(--font-size-xs);
+}
+
 /* Slider customization */
 .parameter-slider .ant-slider-mark-text {
   font-size: var(--font-size-xs);

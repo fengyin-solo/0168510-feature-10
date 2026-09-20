@@ -8,12 +8,13 @@ const { Text } = Typography;
 interface ModelSelectorProps {
   value: string;
   onChange: (value: string) => void;
+  error?: string;
 }
 
 /**
  * 模型选择器组件
  */
-export function ModelSelector({ value, onChange }: ModelSelectorProps) {
+export function ModelSelector({ value, onChange, error }: ModelSelectorProps) {
   const selectedModel = AVAILABLE_MODELS.find((m) => m.id === value);
 
   return (
@@ -39,6 +40,11 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
           </div>
         )}
       />
+      {error && (
+        <Text type="danger" className="input-error">
+          {error}
+        </Text>
+      )}
       {selectedModel?.description && (
         <Text type="secondary" className="model-description">
           {selectedModel.description}

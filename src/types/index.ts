@@ -26,6 +26,7 @@ export type {
   APIConfig,
   ModelInfo,
   ConfigValidation,
+  ConfigSection,
 } from './config'
 
 export type {

@@ -1,15 +1,24 @@
 import { create } from 'zustand';
-import type { AppConfig, ConfigValidation } from '../types';
-import { DEFAULT_CONFIG } from '../types';
+import type { AppConfig, ConfigSection, ConfigValidation } from '../types';
+import { DEFAULT_CONFIG, CONFIG_SECTION_FIELDS } from '../types';
 import { saveConfig, loadConfig } from '../services/storage';
-import { validateConfig, validateAPIKey, validateTemperature, validateMaxTokens } from '../utils/validators';
+import { validateConfig } from '../utils/validators';
+
+/** 取某个区块的默认字段值 */
+function pickSectionDefaults(section: ConfigSection): Partial<AppConfig> {
+  return Object.fromEntries(
+    CONFIG_SECTION_FIELDS[section].map((field) => [field, DEFAULT_CONFIG[field]])
+  ) as Partial<AppConfig>;
+}
 
 interface ConfigState {
-  /** 当前配置 */
+  /** 实际生效的配置（只有保存成功或重置后才会变化） */
   config: AppConfig;
-  /** 配置是否有效 */
+  /** 配置面板里的草稿，未保存的修改只体现在这里 */
+  draft: AppConfig;
+  /** 生效配置是否完整可用（决定能否发送消息） */
   isValid: boolean;
-  /** 验证错误信息 */
+  /** 草稿的校验错误（按字段写明原因） */
   errors: ConfigValidation['errors'];
   /** 是否已初始化 */
   initialized: boolean;
@@ -18,20 +27,20 @@ interface ConfigState {
 interface ConfigActions {
   /** 初始化配置（从 localStorage 加载） */
   initConfig: () => void;
-  /** 更新配置 */
-  updateConfig: (updates: Partial<AppConfig>) => void;
-  /** 验证当前配置 */
-  validateCurrentConfig: () => boolean;
-  /** 重置为默认配置 */
+  /** 更新草稿（不持久化，保存后才生效） */
+  updateDraft: (updates: Partial<AppConfig>) => void;
+  /** 校验并保存草稿；成功返回 true，失败返回 false 并在 errors 中写明原因 */
+  saveDraft: () => boolean;
+  /** 放弃草稿，恢复为实际生效的配置 */
+  discardDraft: () => void;
+  /** 整块重置为默认配置（立即生效并持久化） */
   resetConfig: () => void;
-  /** 设置 API Key */
-  setAPIKey: (apiKey: string) => void;
-  /** 设置模型 */
-  setModel: (model: string) => void;
-  /** 设置 temperature */
-  setTemperature: (temperature: number) => void;
-  /** 设置 maxTokens */
-  setMaxTokens: (maxTokens: number) => void;
+  /** 只重置某个区块为默认值，其他区块不变（立即生效并持久化） */
+  resetSection: (section: ConfigSection) => void;
+  /** 某个区块的草稿是否与实际生效的配置不一致（即改动未保存） */
+  isSectionDirty: (section: ConfigSection) => boolean;
+  /** 是否存在未保存的修改 */
+  isDirty: () => boolean;
 }
 
 type ConfigStore = ConfigState & ConfigActions;
@@ -39,6 +48,7 @@ type ConfigStore = ConfigState & ConfigActions;
 export const useConfigStore = create<ConfigStore>((set, get) => ({
   // Initial state
   config: DEFAULT_CONFIG,
+  draft: DEFAULT_CONFIG,
   isValid: false,
   errors: {},
   initialized: false,
@@ -47,45 +57,59 @@ export const useConfigStore = create<ConfigStore>((set, get) => ({
   initConfig: () => {
     const loadedConfig = loadConfig();
     const validation = validateConfig(loadedConfig);
-    
+
     set({
       config: loadedConfig,
-      isValid: validation.isValid && validateAPIKey(loadedConfig.apiKey),
+      draft: loadedConfig,
+      isValid: validation.isValid,
       errors: validation.errors,
       initialized: true,
     });
   },
 
-  updateConfig: (updates) => {
-    const { config } = get();
-    const newConfig = { ...config, ...updates };
-    const validation = validateConfig(newConfig);
-    
-    // 保存到 localStorage
-    try {
-      saveConfig(newConfig);
-    } catch (error) {
-      console.error('Failed to save config:', error);
-    }
-    
+  updateDraft: (updates) => {
+    const { draft } = get();
+    const newDraft = { ...draft, ...updates };
+
+    // 只更新草稿并即时校验，不触碰生效配置，也不写入 localStorage
     set({
-      config: newConfig,
-      isValid: validation.isValid && validateAPIKey(newConfig.apiKey),
-      errors: validation.errors,
+      draft: newDraft,
+      errors: validateConfig(newDraft).errors,
     });
   },
 
-  validateCurrentConfig: () => {
-    const { config } = get();
-    const validation = validateConfig(config);
-    const isValid = validation.isValid && validateAPIKey(config.apiKey);
-    
+  saveDraft: () => {
+    const { draft } = get();
+    const validation = validateConfig(draft);
+
+    // 参数超出范围或组合不成立时不允许保存，原因写入 errors
+    if (!validation.isValid) {
+      set({ errors: validation.errors });
+      return false;
+    }
+
+    try {
+      saveConfig(draft);
+    } catch (error) {
+      console.error('Failed to save config:', error);
+      return false;
+    }
+
     set({
-      isValid,
-      errors: validation.errors,
+      config: draft,
+      isValid: true,
+      errors: {},
     });
-    
-    return isValid;
+    return true;
+  },
+
+  discardDraft: () => {
+    const { config } = get();
+
+    set({
+      draft: config,
+      errors: validateConfig(config).errors,
+    });
   },
 
   resetConfig: () => {
@@ -94,35 +118,44 @@ export const useConfigStore = create<ConfigStore>((set, get) => ({
     } catch (error) {
       console.error('Failed to save default config:', error);
     }
-    
+
     set({
       config: DEFAULT_CONFIG,
+      draft: DEFAULT_CONFIG,
       isValid: false,
       errors: {},
     });
   },
 
-  setAPIKey: (apiKey) => {
-    const { updateConfig } = get();
-    updateConfig({ apiKey });
-  },
+  resetSection: (section) => {
+    const { config, draft } = get();
+    const defaults = pickSectionDefaults(section);
 
-  setModel: (model) => {
-    const { updateConfig } = get();
-    updateConfig({ model });
-  },
+    // 只覆盖该区块的字段，其他区块的生效值与草稿都保持不变
+    const newConfig = { ...config, ...defaults };
+    const newDraft = { ...draft, ...defaults };
 
-  setTemperature: (temperature) => {
-    if (validateTemperature(temperature)) {
-      const { updateConfig } = get();
-      updateConfig({ temperature });
+    try {
+      saveConfig(newConfig);
+    } catch (error) {
+      console.error('Failed to save config:', error);
     }
+
+    set({
+      config: newConfig,
+      draft: newDraft,
+      isValid: validateConfig(newConfig).isValid,
+      errors: validateConfig(newDraft).errors,
+    });
   },
 
-  setMaxTokens: (maxTokens) => {
-    if (validateMaxTokens(maxTokens)) {
-      const { updateConfig } = get();
-      updateConfig({ maxTokens });
-    }
+  isSectionDirty: (section) => {
+    const { config, draft } = get();
+    return CONFIG_SECTION_FIELDS[section].some((field) => draft[field] !== config[field]);
+  },
+
+  isDirty: () => {
+    const { isSectionDirty } = get();
+    return (Object.keys(CONFIG_SECTION_FIELDS) as ConfigSection[]).some(isSectionDirty);
   },
 }));

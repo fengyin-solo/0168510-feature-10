@@ -7,6 +7,8 @@ const { Text } = Typography;
 interface ParameterSliderProps {
   temperature: number;
   maxTokens: number;
+  temperatureError?: string;
+  maxTokensError?: string;
   onTemperatureChange: (value: number) => void;
   onMaxTokensChange: (value: number) => void;
 }
@@ -17,6 +19,8 @@ interface ParameterSliderProps {
 export function ParameterSlider({
   temperature,
   maxTokens,
+  temperatureError,
+  maxTokensError,
   onTemperatureChange,
   onMaxTokensChange,
 }: ParameterSliderProps) {
@@ -42,6 +46,11 @@ export function ParameterSlider({
             2: '创意',
           }}
         />
+        {temperatureError && (
+          <Text type="danger" className="parameter-error">
+            {temperatureError}
+          </Text>
+        )}
         <Text type="secondary" className="parameter-hint">
           较低的值使输出更确定，较高的值使输出更随机
         </Text>
@@ -73,6 +82,11 @@ export function ParameterSlider({
             />
           </Col>
         </Row>
+        {maxTokensError && (
+          <Text type="danger" className="parameter-error">
+            {maxTokensError}
+          </Text>
+        )}
         <Text type="secondary" className="parameter-hint">
           控制回复的最大长度
         </Text>

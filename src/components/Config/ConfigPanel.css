@@ -12,6 +12,23 @@
   gap: var(--spacing-md);
 }
 
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+}
+
+.section-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.section-status {
+  margin-inline-end: 0;
+}
+
 .section-title {
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-semibold);

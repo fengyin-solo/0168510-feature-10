@@ -78,7 +78,22 @@ export interface ConfigValidation {
   isValid: boolean;
   errors: {
     apiKey?: string;
+    model?: string;
     temperature?: string;
     maxTokens?: string;
   };
 }
+
+/**
+ * 配置面板中的区块划分
+ */
+export type ConfigSection = 'api' | 'model' | 'parameters';
+
+/**
+ * 各区块包含的配置字段（用于分块重置与保存状态判断）
+ */
+export const CONFIG_SECTION_FIELDS: Record<ConfigSection, (keyof AppConfig)[]> = {
+  api: ['apiKey', 'baseUrl'],
+  model: ['model'],
+  parameters: ['temperature', 'maxTokens'],
+};
