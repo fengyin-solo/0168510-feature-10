@@ -19,6 +19,23 @@
   margin: 0;
 }
 
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+}
+
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.section-status {
+  margin-inline-end: 0;
+}
+
 .config-panel-footer {
   display: flex;
   justify-content: flex-end;

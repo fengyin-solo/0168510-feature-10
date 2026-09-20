@@ -1,4 +1,5 @@
 import type { AppConfig, ConfigValidation } from '../types';
+import { AVAILABLE_MODELS } from '../types';
 
 /**
  * 验证 API 密钥格式
@@ -57,6 +58,28 @@ export function validateMaxTokens(maxTokens: number): boolean {
 }
 
 /**
+ * 验证模型名称
+ * @param model 模型 ID
+ * @returns 是否为支持的模型
+ */
+export function validateModel(model: string): boolean {
+  if (!model || typeof model !== 'string') {
+    return false;
+  }
+
+  return AVAILABLE_MODELS.some((m) => m.id === model);
+}
+
+/**
+ * 获取模型允许的最大上下文长度（未声明时不限）
+ * @param model 模型 ID
+ * @returns 最大上下文长度，undefined 表示不限制
+ */
+export function getModelMaxContext(model: string): number | undefined {
+  return AVAILABLE_MODELS.find((m) => m.id === model)?.maxContext;
+}
+
+/**
  * 验证消息内容
  * @param content 消息内容
  * @returns 是否有效（非空白字符串）
@@ -94,22 +117,37 @@ export function validateURL(url: string): boolean {
  */
 export function validateConfig(config: Partial<AppConfig>): ConfigValidation {
   const errors: ConfigValidation['errors'] = {};
-  
+
   // 验证 API Key
-  if (config.apiKey !== undefined && !validateAPIKey(config.apiKey)) {
-    errors.apiKey = 'API 密钥格式无效，请检查后重试';
+  if (config.apiKey !== undefined) {
+    if (config.apiKey === '') {
+      errors.apiKey = '请输入 API 密钥';
+    } else if (!validateAPIKey(config.apiKey)) {
+      errors.apiKey = 'API 密钥格式无效：长度至少 10 位，且只能包含字母、数字、下划线和连字符';
+    }
   }
-  
+
+  // 验证模型
+  if (config.model !== undefined && !validateModel(config.model)) {
+    errors.model = '请选择有效的模型';
+  }
+
   // 验证 temperature
   if (config.temperature !== undefined && !validateTemperature(config.temperature)) {
     errors.temperature = 'Temperature 必须在 0-2 范围内';
   }
-  
+
   // 验证 maxTokens
   if (config.maxTokens !== undefined && !validateMaxTokens(config.maxTokens)) {
     errors.maxTokens = 'Max Tokens 必须是正整数';
+  } else if (config.maxTokens !== undefined && config.model !== undefined) {
+    // 组合校验：Max Tokens 不能超过所选模型的最大上下文长度
+    const maxContext = getModelMaxContext(config.model);
+    if (maxContext !== undefined && config.maxTokens > maxContext) {
+      errors.maxTokens = `Max Tokens 不能超过所选模型的最大上下文长度（${maxContext.toLocaleString()}）`;
+    }
   }
-  
+
   return {
     isValid: Object.keys(errors).length === 0,
     errors,

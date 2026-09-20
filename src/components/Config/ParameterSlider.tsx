@@ -9,6 +9,8 @@ interface ParameterSliderProps {
   maxTokens: number;
   onTemperatureChange: (value: number) => void;
   onMaxTokensChange: (value: number) => void;
+  temperatureError?: string;
+  maxTokensError?: string;
 }
 
 /**
@@ -19,6 +21,8 @@ export function ParameterSlider({
   maxTokens,
   onTemperatureChange,
   onMaxTokensChange,
+  temperatureError,
+  maxTokensError,
 }: ParameterSliderProps) {
   return (
     <div className="parameter-slider">
@@ -27,14 +31,14 @@ export function ParameterSlider({
         <div className="parameter-header">
           <label className="input-label">Temperature</label>
           <Text type="secondary" className="parameter-value">
-            {temperature.toFixed(1)}
+            {Number.isFinite(temperature) ? temperature.toFixed(1) : '-'}
           </Text>
         </div>
         <Slider
           min={0}
           max={2}
           step={0.1}
-          value={temperature}
+          value={typeof temperature === 'number' && Number.isFinite(temperature) ? temperature : 0}
           onChange={onTemperatureChange}
           marks={{
             0: '精确',
@@ -42,9 +46,15 @@ export function ParameterSlider({
             2: '创意',
           }}
         />
-        <Text type="secondary" className="parameter-hint">
-          较低的值使输出更确定，较高的值使输出更随机
-        </Text>
+        {temperatureError ? (
+          <Text type="danger" className="parameter-error">
+            {temperatureError}
+          </Text>
+        ) : (
+          <Text type="secondary" className="parameter-hint">
+            较低的值使输出更确定，较高的值使输出更随机
+          </Text>
+        )}
       </div>
 
       {/* Max Tokens */}
@@ -58,24 +68,35 @@ export function ParameterSlider({
               min={100}
               max={8192}
               step={100}
-              value={maxTokens}
+              value={typeof maxTokens === 'number' && Number.isFinite(maxTokens) ? maxTokens : 100}
               onChange={onMaxTokensChange}
             />
           </Col>
           <Col span={8}>
             <InputNumber
-              min={100}
+              min={1}
               max={8192}
               step={100}
+              status={maxTokensError ? 'error' : undefined}
               value={maxTokens}
-              onChange={(value) => value && onMaxTokensChange(value)}
+              onChange={(value) => {
+                if (value !== null) {
+                  onMaxTokensChange(value);
+                }
+              }}
               style={{ width: '100%' }}
             />
           </Col>
         </Row>
-        <Text type="secondary" className="parameter-hint">
-          控制回复的最大长度
-        </Text>
+        {maxTokensError ? (
+          <Text type="danger" className="parameter-error">
+            {maxTokensError}
+          </Text>
+        ) : (
+          <Text type="secondary" className="parameter-hint">
+            控制回复的最大长度
+          </Text>
+        )}
       </div>
     </div>
   );

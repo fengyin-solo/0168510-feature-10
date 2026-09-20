@@ -78,7 +78,16 @@ export interface ConfigValidation {
   isValid: boolean;
   errors: {
     apiKey?: string;
+    model?: string;
     temperature?: string;
     maxTokens?: string;
   };
 }
+
+/**
+ * 配置分块
+ * - apiKey: 密钥
+ * - model: 模型
+ * - parameters: 参数调整（temperature / maxTokens）
+ */
+export type ConfigSection = 'apiKey' | 'model' | 'parameters';
